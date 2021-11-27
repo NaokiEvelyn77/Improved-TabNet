@@ -1,0 +1,66 @@
+# =============================================================================
+# 新加的部分，学习全局特征的支路
+# =============================================================================
+class BasicBlock(torch.nn.Module):
+    def __init__(self,input_size,hidden_size):
+        super(BasicBlock,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.layer1 = torch.nn.Sequential(
+                                  torch.nn.Linear(self.input_size,self.hidden_size),
+                                  torch.nn.ReLU(),
+                                  torch.nn.BatchNorm1d(self.hidden_size)
+                                  )
+        self.layer3=torch.nn.Sequential(torch.nn.Linear(self.hidden_size,self.input_size),
+                                  torch.nn.BatchNorm1d(self.input_size)
+                                  )
+        self.relu = torch.nn.ReLU()
+
+    def forward(self,x):
+        out = self.layer1(x)
+        out = self.layer3(out)
+        out = (out+x)*np.sqrt(0.5)
+        out = self.relu(out)
+        return out
+
+class global_encoder(torch.nn.Module):
+    def __init__(self,input_size):
+        
+        super(global_encoder,self).__init__()
+        self.softmax = torch.nn.Softmax()
+# =============================================================================
+#取消encoder
+# =============================================================================
+        # self.encoder = torch.nn.Sequential(
+        #         torch.nn.Linear(input_size,400),
+        #         torch.nn.ReLU(True),
+        #         torch.nn.BatchNorm1d(400),
+
+        #         torch.nn.Linear(400,350),
+        #         torch.nn.ReLU(True),
+        #         torch.nn.BatchNorm1d(350),
+
+        #         torch.nn.Linear(350,128),
+        #         torch.nn.ReLU(True),
+        #         torch.nn.BatchNorm1d(128),
+        #         )
+        
+        self.basicblock1 = BasicBlock(input_size,2*input_size)
+        self.basicblock3 = BasicBlock(input_size,2*input_size)
+        self.dropout = torch.nn.Dropout(0.2)
+        
+        self.attention1 = torch.nn.Sequential(
+                torch.nn.Linear(input_size,64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64,input_size)
+                )
+        self.output_block = torch.nn.Linear(input_size,64)
+    def forward(self,x):
+        x1 = self.encoder(x)
+        fc_out = self.basicblock1(x1)
+        atten1 = self.attention1(fc_out)
+        atten1 = self.softmax(atten1)
+        fc_out = self.basicblock3(fc_out)
+        fc_out = torch.mul(fc_out,atten1)
+        out = self.output_block(fc_out)
+        return out
